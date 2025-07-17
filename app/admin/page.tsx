@@ -10,10 +10,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { collection, getDocs } from "firebase/firestore" // Removed addDoc, updateDoc, deleteDoc
+import { collection, getDocs } from "firebase/firestore"
 import { db, isFirebaseAvailable as checkFirebaseInitialized } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
-import { Pencil, Trash2, Plus, ImageOff } from "lucide-react"
+import { Pencil, Trash2, Plus, ImageOff, Loader2 } from "lucide-react" // Added Loader2 for spinner
 import {
   Dialog,
   DialogContent,
@@ -23,14 +23,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import Image from "next/image"
-import { useActionState } from "react" // Import useActionState
-import {
-  addProductAction, // New Server Action import
-  updateProductAction, // New Server Action import
-  deleteProductAction, // New Server Action import
-} from "@/app/actions/product-actions" // Path to new Server Actions
-import { Alert, AlertDescription } from "@/components/ui/alert" // Ensure Alert is imported
-import { useAuth } from "@/components/auth-provider" // Declare useAuth hook
+import { useActionState } from "react"
+import { addProductAction, updateProductAction, deleteProductAction } from "@/app/actions/product-actions"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/components/auth-provider"
 
 interface Product {
   id: string
@@ -241,7 +237,7 @@ export default function AdminPage() {
                   <Label htmlFor="name">Product Name</Label>
                   <Input
                     id="name"
-                    name="name" // Added name attribute for FormData
+                    name="name"
                     value={newProductName}
                     onChange={(e) => setNewProductName(e.target.value)}
                     required
@@ -251,7 +247,7 @@ export default function AdminPage() {
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
-                    name="description" // Added name attribute for FormData
+                    name="description"
                     value={newProductDescription}
                     onChange={(e) => setNewProductDescription(e.target.value)}
                     required
@@ -262,7 +258,7 @@ export default function AdminPage() {
                     <Label htmlFor="price">Price</Label>
                     <Input
                       id="price"
-                      name="price" // Added name attribute for FormData
+                      name="price"
                       type="text"
                       step="0.01"
                       value={newProductPrice}
@@ -274,7 +270,7 @@ export default function AdminPage() {
                     <Label htmlFor="category">Category</Label>
                     <Input
                       id="category"
-                      name="category" // Added name attribute for FormData
+                      name="category"
                       value={newProductCategory}
                       onChange={(e) => setNewProductCategory(e.target.value)}
                       required
@@ -285,23 +281,31 @@ export default function AdminPage() {
                   <Label htmlFor="image">Product Image</Label>
                   <Input
                     id="image"
-                    name="image" // Added name attribute for FormData
+                    name="image"
                     type="file"
                     accept="image/*"
                     onChange={handleNewProductImageSelect}
                     className="flex-1"
-                    disabled={!isFirebaseAvailable}
+                    disabled={!isFirebaseAvailable || addState?.pending}
                   />
-                  {newProductImagePreviewUrl && (
-                    <div className="mt-2 relative w-32 h-32 border rounded-md overflow-hidden">
-                      <Image
-                        src={newProductImagePreviewUrl || "/placeholder.svg"}
-                        alt="Image Preview"
-                        fill
-                        className="object-cover"
-                      />
+                  {(newProductImagePreviewUrl || addState?.pending) && (
+                    <div className="mt-2 relative w-32 h-32 border rounded-md overflow-hidden flex items-center justify-center">
+                      {addState?.pending ? (
+                        <div className="flex flex-col items-center text-gray-500">
+                          <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                          <span className="text-sm">Uploading...</span>
+                        </div>
+                      ) : (
+                        <Image
+                          src={newProductImagePreviewUrl || "/placeholder.svg"}
+                          alt="Image Preview"
+                          fill
+                          className="object-cover"
+                        />
+                      )}
                     </div>
                   )}
+                  <p className="text-sm text-gray-500 mt-1">Image will be uploaded when you click "Add Product".</p>
                   {addState?.success === false && addState.message.includes("upload failed") && (
                     <Alert variant="destructive" className="mt-2">
                       <ImageOff className="h-4 w-4" />
@@ -452,17 +456,26 @@ export default function AdminPage() {
                     type="file"
                     accept="image/*"
                     onChange={handleEditProductImageSelect}
+                    disabled={updateState?.pending}
                   />
-                  {(editProductImagePreviewUrl || editProductCurrentImageUrl) && (
-                    <div className="mt-2 relative w-32 h-32 border rounded-md overflow-hidden">
-                      <Image
-                        src={editProductImagePreviewUrl || editProductCurrentImageUrl || "/placeholder.svg"}
-                        alt="Current Image"
-                        fill
-                        className="object-cover"
-                      />
+                  {(editProductImagePreviewUrl || editProductCurrentImageUrl || updateState?.pending) && (
+                    <div className="mt-2 relative w-32 h-32 border rounded-md overflow-hidden flex items-center justify-center">
+                      {updateState?.pending ? (
+                        <div className="flex flex-col items-center text-gray-500">
+                          <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                          <span className="text-sm">Uploading...</span>
+                        </div>
+                      ) : (
+                        <Image
+                          src={editProductImagePreviewUrl || editProductCurrentImageUrl || "/placeholder.svg"}
+                          alt="Current Image"
+                          fill
+                          className="object-cover"
+                        />
+                      )}
                     </div>
                   )}
+                  <p className="text-sm text-gray-500 mt-1">Image will be uploaded when you click "Update Product".</p>
                   {updateState?.success === false && updateState.message.includes("upload failed") && (
                     <Alert variant="destructive" className="mt-2">
                       <ImageOff className="h-4 w-4" />

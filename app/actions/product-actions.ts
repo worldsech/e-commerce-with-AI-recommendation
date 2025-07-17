@@ -1,48 +1,55 @@
 "use server"
 
-import { v2 as cloudinary } from "cloudinary"
 import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase" // Ensure db is imported and available on server
-
-// Configure Cloudinary on the server
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+import { db } from "@/lib/firebase"
 
 /**
- * Uploads a file to Cloudinary.
+ * Uploads a file to Cloudinary using a direct HTTP POST request (unsigned upload).
+ * This bypasses the Cloudinary SDK's internal methods that might rely on Node.js 'crypto'.
  * @param file The File object to upload.
  * @returns The secure URL of the uploaded image.
  */
 async function uploadFileToCloudinary(file: File): Promise<string> {
-  try {
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  // Updated default upload preset name to "default" as per user's clarification
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "default"
 
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader
-        .upload_stream(
-          {
-            upload_preset: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "default", // Use environment variable for preset
-          },
-          (error, result) => {
-            if (error) {
-              console.error("Cloudinary upload error:", error)
-              reject(new Error(`Cloudinary upload failed: ${error.message}`))
-            } else if (result && result.secure_url) {
-              resolve(result.secure_url)
-            } else {
-              reject(new Error("Cloudinary upload failed: No secure_url returned."))
-            }
-          },
-        )
-        .end(buffer)
+  // Log the values being used for debugging
+  console.log("Cloudinary Upload Debug:")
+  console.log("  Cloud Name:", cloudName)
+  console.log("  Upload Preset:", uploadPreset)
+
+  if (!cloudName) {
+    throw new Error("Cloudinary cloud name is not configured. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME.")
+  }
+  if (!uploadPreset) {
+    throw new Error("Cloudinary upload preset is not configured. Please set NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.")
+  }
+
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("upload_preset", uploadPreset)
+
+  try {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: "POST",
+      body: formData,
     })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (data.secure_url) {
+      return data.secure_url
+    } else {
+      throw new Error("Cloudinary upload failed: No secure_url returned in response.")
+    }
   } catch (error: any) {
-    console.error("Error processing image for upload:", error)
-    throw new Error(`Image processing failed: ${error.message}`)
+    console.error("Error uploading image to Cloudinary:", error)
+    throw new Error(`Image upload failed: ${error.message}`)
   }
 }
 
